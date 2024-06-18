@@ -1,43 +1,58 @@
-const { offlineFallback, warmStrategyCache } = require('workbox-recipes');
-const { CacheFirst, StaleWhileRevalidate } = require('workbox-strategies');
-const { registerRoute } = require('workbox-routing');
-const { CacheableResponsePlugin } = require('workbox-cacheable-response');
-const { ExpirationPlugin } = require('workbox-expiration');
-const { precacheAndRoute } = require('workbox-precaching/precacheAndRoute');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const WebpackPwaManifest = require('webpack-pwa-manifest');
+const path = require('path');
+const { InjectManifest } = require('workbox-webpack-plugin');
 
-precacheAndRoute(self.__WB_MANIFEST);
+// TODO: Add and configure workbox plugins for a service worker and manifest file.
+// TODO: Add CSS loaders and babel to webpack.
 
-const pageCache = new CacheFirst({
-  cacheName: 'page-cache',
+module.exports = {
+  mode: "development",
+  entry: {
+    main: "./src/js/index.js",
+    install: "./src/js/install.js",
+  },
+  output: {
+    filename: "[name].bundle.js",
+    path: path.resolve(__dirname, "dist"),
+    publicPath: "/", // Adjust if serving from a subdirectory
+  },
   plugins: [
-    new CacheableResponsePlugin({
-      statuses: [0, 200],
+    new HtmlWebpackPlugin({
+      template: "./src/index.html", // Specify your own HTML template if needed
     }),
-    new ExpirationPlugin({
-      maxAgeSeconds: 30 * 24 * 60 * 60,
+    new WebpackPwaManifest({
+      name: "SmartTextEdit",
+      short_name: "TextEditor",
+      description: "My awesome text editor!",
+      background_color: "#ffffff",
+      icons: [
+        {
+          src: path.resolve("./src/images/logo.png"),
+          sizes: [96, 128, 192, 256, 384, 512], // Multiple icon sizes
+        },
+      ],
+    }),
+    new InjectManifest({
+      swSrc: "./src-sw.js", // Path to your service worker source file
     }),
   ],
-});
-
-warmStrategyCache({
-  urls: ['/index.html', '/'],
-  strategy: pageCache,
-});
-
-registerRoute(({ request }) => request.mode === 'navigate', pageCache);
-
-// Implement asset caching
-registerRoute(
-  // Match CSS, JS, and image files
-  ({ request }) => request.destination === 'style' ||
-                   request.destination === 'script' ||
-                   request.destination === 'image',
-  new StaleWhileRevalidate({
-    cacheName: 'asset-cache',
-    plugins: [
-      new CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
+  module: {
+    rules: [
+      {
+        test: /\.css$/i,
+        use: ["style-loader", "css-loader"],
+      },
+      {
+        test: /\.(js|mjs|cjs)$/,
+        exclude: /node_modules/,
+        use: {
+          loader: "babel-loader",
+          options: {
+            presets: [["@babel/preset-env", { targets: "defaults" }]],
+          },
+        },
+      },
     ],
-  })
-);
+  },  
+};
